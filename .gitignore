@@ -3,3 +3,5 @@
 **/Icon
 **/*.gdoc
 **/*.gsheet
+**/*.tmp
+**/*.FCStd.*
