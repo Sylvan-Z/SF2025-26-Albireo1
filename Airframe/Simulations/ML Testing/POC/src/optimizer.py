@@ -1,8 +1,6 @@
-import tensorflow as tf
 import keras
-
-from numpy import arange, array, clip
-from itertools import product
+import numpy as np
+import itertools
 
 filepath = input("Filepath: ")
 
@@ -10,9 +8,8 @@ model = keras.models.load_model(filepath+"/model.keras")
 
 searchStep = 0.01
 
-allFeatures = list(map(list,product(list(arange(0, 1+searchStep, searchStep)), repeat=2)))
-print(allFeatures)
-allDrags = list(map(lambda x: x[0], model.predict(array(allFeatures))))
+allFeatures = list(map(list, itertools.product(list(np.arange(0, 1+searchStep, searchStep)), repeat=2)))
+allDrags = list(map(lambda x: x[0], model.predict(np.array(allFeatures))))
 
 bestFeatures=[]
 bestdrag=float("inf")
@@ -36,12 +33,12 @@ while sum(map(lambda x: abs(x), derivitives))/len(derivitives)>0.0001:
     for i in range(len(bestFeatures)):
         dFeatures=bestFeatures
         dFeatures[i]+=deltaF
-        dDrag=model.predict(array([dFeatures]))[0][0]
+        dDrag=model.predict(np.array([dFeatures]))[0][0]
         derivitives.append((dDrag-bestdrag)/deltaF)
     for i in range(len(bestFeatures)):
         bestFeatures[i]-=derivitives[i]*deltaT
-        bestFeatures[i]=clip(bestFeatures[i],0,1)
-    bestdrag=model.predict(array([bestFeatures]))[0][0]
+        bestFeatures[i]=np.clip(bestFeatures[i],0,1)
+    bestdrag=model.predict(np.array([bestFeatures]))[0][0]
     iterations+=1
     print("Iteration %d: Predicted %s as the best with drag %f, average gradient %f" % (iterations, str(bestFeatures), bestdrag, sum(derivitives)/len(derivitives)))
 

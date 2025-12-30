@@ -1,6 +1,5 @@
-import tensorflow as tf
 import keras
-import numpy
+import numpy as np
 import shutil
 
 inFilepath = input("Filepath In: ")
@@ -19,15 +18,12 @@ with open(inFilepath+"/dataset.csv", "r") as inputFile:
 
 shutil.copyfile(inFilepath+"/dataset.csv", outFilepath+"/dataset.csv")
 
-print(xSet)
-print(ySet)
-
 model = keras.models.load_model(inFilepath+"/model.keras")
 
 print(model)
 
-model.fit(numpy.array(xSet,dtype=float), numpy.array(ySet,dtype=float), epochs=5000, shuffle=True, batch_size=25, callbacks=[keras.callbacks.EarlyStopping(monitor='loss', patience=100)])
+model.fit(np.array(xSet,dtype=float), np.array(ySet,dtype=float), epochs=5000, shuffle=True, batch_size=25, callbacks=[keras.callbacks.EarlyStopping(monitor='loss', patience=100)])
 
-model.evaluate(numpy.array(xSet,dtype=float), numpy.array(ySet,dtype=float))
+model.evaluate(np.array(xSet,dtype=float), np.array(ySet,dtype=float))
 
 model.save(outFilepath+"/model.keras")
