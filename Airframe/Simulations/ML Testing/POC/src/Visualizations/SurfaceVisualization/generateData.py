@@ -43,7 +43,8 @@ fig.add_trace(go.Scatter3d(x=list(x), y=list(y), z=list(z), mode='markers', mark
 fig.update_layout(
     scene = dict(
         xaxis = dict(nticks=4, range=[0,1],),
-                     yaxis = dict(nticks=4, range=[0,1],),
-                     zaxis = dict(nticks=4, range=[-210,-200],),))
+        yaxis = dict(nticks=4, range=[0,1],),
+        zaxis = dict(nticks=4, range=[-207,-202],),
+        aspectmode='cube'))
 
 fig.show()
