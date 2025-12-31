@@ -5,6 +5,11 @@ import shutil
 inFilepath = input("Filepath In: ")
 outFilepath = input("Filepath Out: ")
 
+controlDrag = None
+with open(inFilepath+"/dataset.csv", "r") as inputFile:
+    controlDrag = float(inputFile.readlines()[1].strip().split(",")[2])
+    inputFile.close()
+
 xSet=[]
 ySet=[]
 with open(inFilepath+"/dataset.csv", "r") as inputFile:
@@ -13,7 +18,7 @@ with open(inFilepath+"/dataset.csv", "r") as inputFile:
     for line in inputList:
         data = line.strip().split(",")
         xSet.append([float(data[0]), float(data[1])])
-        ySet.append(float(data[2]))
+        ySet.append(float(data[2])-controlDrag)
     inputFile.close()
 
 shutil.copyfile(inFilepath+"/dataset.csv", outFilepath+"/dataset.csv")
@@ -22,7 +27,7 @@ model = keras.models.load_model(inFilepath+"/model.keras")
 
 print(model)
 
-model.fit(np.array(xSet,dtype=float), np.array(ySet,dtype=float), epochs=5000, shuffle=True, batch_size=25, callbacks=[keras.callbacks.EarlyStopping(monitor='loss', patience=100)])
+model.fit(np.array(xSet,dtype=float), np.array(ySet,dtype=float), epochs=1000, shuffle=True, callbacks=[keras.callbacks.EarlyStopping(monitor='loss', patience=100)])
 
 model.evaluate(np.array(xSet,dtype=float), np.array(ySet,dtype=float))
 

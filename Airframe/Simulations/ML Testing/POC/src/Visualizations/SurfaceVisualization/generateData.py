@@ -7,9 +7,14 @@ filepath = input("Filepath: ")
 
 model = keras.models.load_model(filepath+"/model.keras")
 
-step=0.05
+controlDrag = None
+with open(filepath+"/dataset.csv", "r") as inputFile:
+    controlDrag = float(inputFile.readlines()[1].strip().split(",")[2])
+    inputFile.close()
+
+step=0.01
 allFeatures = list(map(list, itertools.product(list(np.arange(0, 1+step, step)), repeat=2)))
-allDrags = list(map(lambda x: x[0], model.predict(np.array(allFeatures))))
+allDrags = list(map(lambda x: x[0]+controlDrag, model.predict(np.array(allFeatures))))
 
 x=map(lambda x: x[0], allFeatures)
 y=map(lambda x: x[1], allFeatures)
@@ -44,7 +49,7 @@ fig.update_layout(
     scene = dict(
         xaxis = dict(nticks=4, range=[0,1],),
         yaxis = dict(nticks=4, range=[0,1],),
-        zaxis = dict(nticks=4, range=[-207,-202],),
+        zaxis = dict(nticks=4, range=[-205,-202],),
         aspectmode='cube'))
 
 fig.show()
