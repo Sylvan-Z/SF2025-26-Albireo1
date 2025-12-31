@@ -1,6 +1,7 @@
 import keras
 import numpy as np
 import itertools
+import plotly.graph_objects as go
 
 filepath = input("Filepath: ")
 
@@ -11,28 +12,37 @@ with open(filepath+"/dataset.csv", "r") as inputFile:
     controlDrag = float(inputFile.readlines()[1].strip().split(",")[2])
     inputFile.close()
 
-searchStep = 0.01
-
-allFeatures = list(map(list, itertools.product(list(np.arange(0, 1+searchStep, searchStep)), repeat=2)))
+step=0.01
+allFeatures = list(map(list, itertools.product(list(np.arange(0, 1+step, step)), repeat=2)))
 allDrags = list(map(lambda x: x[0]+controlDrag, model.predict(np.array(allFeatures))))
 
-bestFeatures=[]
-bestdrag=float("inf")
+x=map(lambda x: x[0], allFeatures)
+y=map(lambda x: x[1], allFeatures)
+z=allDrags
 
-for i in range(len(allFeatures)):
-    if allDrags[i]<bestdrag:
-        bestdrag=allDrags[i]
-        bestFeatures=allFeatures[i]
+fig = go.Figure()
 
-print("Done broad search")
-print(format("Predicted %s as the best with drag %f" % (str(bestFeatures), bestdrag)))
-print("Starting gradient descent refinement")
+fig.add_trace(go.Mesh3d(x=list(x),
+                   y=list(y),
+                   z=list(z),
+                   opacity=0.5,
+                   colorscale='RdBu',
+                   intensity=list(z),
+                   showscale=True))
+
+bestFeatures=[0.75,0.75]
+bestdrag=model.predict(np.array([bestFeatures]))[0][0]+controlDrag
+
+x=[bestFeatures[0]]
+y=[bestFeatures[1]]
+z=[bestdrag]
+
 
 deltaF=0.01
-deltaT=10
+deltaT=50
 residuals=[float("inf")]
 iterations=0
-while sum(map(lambda x: abs(x), residuals))/len(residuals)!=0.000000:
+while sum(map(lambda x: abs(x), residuals))/len(residuals)!=0.000000 and iterations<300:
     allDFeatures=[]
     for i in range(len(bestFeatures)):
         allDFeatures.append(bestFeatures.copy())
@@ -48,8 +58,17 @@ while sum(map(lambda x: abs(x), residuals))/len(residuals)!=0.000000:
     bestdrag=model.predict(np.array([bestFeatures]))[0][0]+controlDrag
     iterations+=1
     print("Iteration %d: Predicted %s as the best with drag %f, average residual %f" % (iterations, str(bestFeatures), bestdrag, sum(map(lambda x: abs(x), residuals))/len(residuals)))
+    x.append(bestFeatures[0])
+    y.append(bestFeatures[1])
+    z.append(bestdrag)
 
-print("Done refinement")
-print(format("Predicted %s as the best with drag %f" % (str(bestFeatures), bestdrag)))
-open(filepath+"/log.txt","w+").write(format("Predicted %s as the best with drag %f\nActual drag: " % (str(bestFeatures), bestdrag)))
-open(filepath+"/dataset.csv","a").write(format("\n%f,%f" % (bestFeatures[0], bestFeatures[1])))
+fig.add_trace(go.Scatter3d(x=list(x), y=list(y), z=list(z), mode='markers+lines', marker=dict(size=2, color='black')))
+
+fig.update_layout(
+    scene = dict(
+        xaxis = dict(nticks=4, range=[0,1],),
+        yaxis = dict(nticks=4, range=[0,1],),
+        zaxis = dict(nticks=4, range=[-205,-202],),
+        aspectmode='cube'))
+
+fig.show()
