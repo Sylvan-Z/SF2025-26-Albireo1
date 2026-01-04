@@ -1,0 +1,2 @@
+Predicted [9.0, 3.200012531876564, 0.1000007301568985] as the best with drag 136.783042
+Actual drag: 

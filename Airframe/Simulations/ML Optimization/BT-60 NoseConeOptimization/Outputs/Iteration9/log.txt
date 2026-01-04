@@ -1,0 +1,4 @@
+Predicted [9.0, 2.9999981373548508, 0.0] as the best with drag 136.792704
+Actual drag: 
+
+Solver Converged
