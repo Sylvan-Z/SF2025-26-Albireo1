@@ -30,7 +30,7 @@ fig.add_trace(go.Mesh3d(x=list(x),
                    intensity=list(z),
                    showscale=True))
 
-bestFeatures=[0.75,0.75]
+bestFeatures=[0.5,0.75]
 bestdrag=model.predict(np.array([bestFeatures]))[0][0]+controlDrag
 
 x=[bestFeatures[0]]
@@ -39,7 +39,7 @@ z=[bestdrag]
 
 
 deltaF=0.01
-deltaT=50
+deltaT=70
 residuals=[float("inf")]
 iterations=0
 while sum(map(lambda x: abs(x), residuals))/len(residuals)!=0.000000 and iterations<300:
