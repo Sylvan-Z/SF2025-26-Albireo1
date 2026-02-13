@@ -1,4 +1,6 @@
 import math
+import csv as csvReaders
+import numpy as np
 
 class Vector:
     def __init__(self, components:tuple[float]):
@@ -53,6 +55,32 @@ def earthAtmosphericModel(h):
     #Outputs in kg/m^3, °C, and kPa
     return rho, T, p
 
+class Motor:
+    def __init__(self,filepath:str):
+        csv=open(filepath,'r')
+        reader=csvReaders.DictReader(csv)
+        force=[]
+        time=[]
+        mass=[]
+        for row in reader:
+            force.append(row["f_t"])
+            time.append(row["t"])
+            mass.append(row["m"])
+        self.force=np.array(force)
+        self.time=np.array(time)
+        self.mass=np.array(mass)
+
+    def __init__(self,time:list[float],force:list[float],mass:list[float]):
+        self.force=np.array(force)
+        self.time=np.array(time)
+        self.mass=np.array(mass)
+
+    def getMass(self,t:float)->float:
+        return np.interp([t],self.time,self.mass)[0]
+    
+    def getThrust(self,t:float)->float:
+        return np.interp([t],self.time,self.mass)[0]
+
 #Force Types
 #Statics
 @staticmethod
@@ -62,28 +90,36 @@ def gravity(rocket:'Rocket'):
     r = 6371000 #Earth mean radius, m
     return Vector(0,0,rocket.mass*g*r/((r+rocket.pos.z)**2))
 
+@staticmethod
+def thrust(rocket:'Rocket'):
+    return rocket.motor.getThrust(rocket.midT)
 
+@staticmethod
 def drag(rocket:'Rocket'):
-    '''Calculates gravity, varying with the rocket's altitude'''
+    '''Calculates linear drag coeffecient, varying rocket velocity'''
     v=rocket.vel.mag()
     rho,T,p=earthAtmosphericModel(rocket.pos.z)
     return -0.5*rho*rocket.AC_d*v #one V, because linear scaling by vector velocity
 
 
-
 class Rocket:
     '''mass[kg]'''
-    def __init__(self, mass=1, AC_d=0.5, initPos:Vector=Vector(0,0,0), initVel:Vector=Vector(0,0,0), statForces:list[function]=[gravity], linForces:list[function]=[drag]):
-        self.mass=mass
+    def __init__(self, drymass=1, AC_d=0.5, motor:Motor=Motor([0],[0],[0]), initPos:Vector=Vector(0,0,0), initVel:Vector=Vector(0,0,0), statForces:list[function]=[gravity,thrust], linForces:list[function]=[drag]):
+        self.drymass=drymass
         self.AC_d=AC_d #Area-drag Coefficient, m^2
 
         self.pos:Vector=initPos
         self.vel:Vector=initVel
 
+        self.motor=motor
+
         self.statForceFunctions=statForces
         self.linForceFunctions=linForces
 
         self.t=0.0
+
+        self.midT=0.0
+        self.updateMassForces(0)
 
     def AC_dFromDrag(self, drag:float, v, rho):
         '''
@@ -107,11 +143,21 @@ class Rocket:
             linForceFactor+=force(self)
 
         return statForce, linForceFactor
+    
+    def calculateMass(self):
+        return self.drymass+self.motor.getMass()
+
+    def updateMassForces(self,deltaT):
+        self.midT=self.t+deltaT/2 #Store midpoint of simulated timestep for motor simulation
+        self.staticF,self.linF=self.calculateForces()
+        self.mass=self.calculateMass()
 
     def simStep(self, deltaT:float):
-        #Create variables for better manipulation
-        F,k=self.calculateForces()
+        self.updateMassForces(deltaT)
+        #Create variables for easier manipulation
         m=self.mass
+        F=self.staticF
+        k=self.linF
         t=deltaT
         v_0=self.vel
         d_0=self.pos
@@ -126,3 +172,4 @@ class Rocket:
             self.vel=(math.exp(k*t/m)*(k*v_0+F)-F)/k
             #Calculate new position
             self.pos=((m*(math.exp(k*t/m)-1)*(k*v_0+F))/(k**2))-(F*t/k)+d_0
+        self.t+=deltaT
