@@ -88,8 +88,7 @@ def gravity(rocket:'Rocket'):
     '''Calculates gravity, varying with the rocket's altitude'''
     g = -9.81   # m/s^2, gravity
     r = 6371000 #Earth mean radius, m
-    #return Vector(0,0,rocket.mass*g*r/((r+rocket.pos.z)**2))
-    return Vector(0,0,rocket.mass*g)
+    return Vector(0,0,rocket.mass*g*(r/(r+rocket.pos.z))**2)
 
 @staticmethod
 def thrust(rocket:'Rocket'):
@@ -173,6 +172,7 @@ class Rocket:
             self.vel=(math.exp(k*t/m)*(k*v_0+F)-F)/k
             #Calculate new position
             self.pos=((m*(math.exp(k*t/m)-1)*(k*v_0+F))/(k**2))-(F*t/k)+d_0
+            #See Logbook day Feb.13 for derivitation of these formulea
         self.t+=deltaT
 
     def __repr__(self):
