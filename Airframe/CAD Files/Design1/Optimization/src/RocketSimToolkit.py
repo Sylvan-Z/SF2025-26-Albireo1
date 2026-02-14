@@ -2,35 +2,38 @@ import math
 import csv as csvReaders
 import numpy as np
 
-class Vector:
-    def __init__(self, components:tuple[float]):
-        self.components = components
-        self.dimensions = len(components)
-        self.generateXYZ()
+from typing import Callable
 
+class Vector:
     def __init__(self, *args:float):
         self.components = tuple(args)
         self.dimensions = len(self.components)
         self.generateXYZ()
 
+    def __getitem__(self,i):
+        return self.components[i]
+
     def generateXYZ(self):
-        if(self.dimensions>=1):self.x=self.components[0]
-        if(self.dimensions>=2):self.y=self.components[1]
-        if(self.dimensions>=3):self.z=self.components[2]
+        if(self.dimensions>=1):self.x=self[0]
+        if(self.dimensions>=2):self.y=self[1]
+        if(self.dimensions>=3):self.z=self[2]
     
     def mag(self):
-        return Vector(math.sqrt(sum(map(lambda x:x**2,self.components))))
+        return math.sqrt(sum(map(lambda x:x**2,self.components)))
     
     def __add__(self, other:'Vector'):
-        return Vector(tuple([self[i]+other[i] for i in range(self.dimensions)]))
+        return Vector(*tuple([self[i]+other[i] for i in range(self.dimensions)]))
     
     def __sub__(self, other:'Vector'):
-        return Vector(tuple([self[i]-other[i] for i in range(self.dimensions)]))
+        return Vector(*tuple([self[i]-other[i] for i in range(self.dimensions)]))
     
     def __mul__(self, factor:float):
-        return Vector(tuple(map(lambda x:factor*x,self.components)))
+        return Vector(*tuple(map(lambda x:factor*x,self.components)))
     
-    def __div__(self, factor:float):
+    def __rmul__(self, factor:float):
+        return Vector(*tuple(map(lambda x:factor*x,self.components)))
+    
+    def __truediv__(self, factor:float):
         return self*(1/factor)
     
     def unitVector(self):
@@ -56,30 +59,27 @@ def earthAtmosphericModel(h):
     return rho, T, p
 
 class Motor:
-    def __init__(self,filepath:str):
-        csv=open(filepath,'r')
-        reader=csvReaders.DictReader(csv)
-        force=[]
-        time=[]
-        mass=[]
-        for row in reader:
-            force.append(row["f_t"])
-            time.append(row["t"])
-            mass.append(row["m"])
-        self.force=np.array(force)
-        self.time=np.array(time)
-        self.mass=np.array(mass)
+    def __init__(self, time:list[float]=[], force:list[float]=[], mass:list[float]=[], filepath:str=None):
+        if(filepath!=None):
+            csv=open(filepath,'r')
+            reader=csvReaders.DictReader(csv)
+            force=[]
+            time=[]
+            mass=[]
+            for row in reader:
+                force.append(float(row["f_t"]))
+                time.append(float(row["t"]))
+                mass.append(float(row["m"])/1000)
 
-    def __init__(self,time:list[float],force:list[float],mass:list[float]):
-        self.force=np.array(force)
-        self.time=np.array(time)
-        self.mass=np.array(mass)
+        self.force=np.array(force,dtype=float)
+        self.time=np.array(time,dtype=float)
+        self.mass=np.array(mass,dtype=float)
 
     def getMass(self,t:float)->float:
         return np.interp([t],self.time,self.mass)[0]
     
     def getThrust(self,t:float)->float:
-        return np.interp([t],self.time,self.mass)[0]
+        return np.interp([t],self.time,self.force)[0]
 
 #Force Types
 #Statics
@@ -88,11 +88,12 @@ def gravity(rocket:'Rocket'):
     '''Calculates gravity, varying with the rocket's altitude'''
     g = -9.81   # m/s^2, gravity
     r = 6371000 #Earth mean radius, m
-    return Vector(0,0,rocket.mass*g*r/((r+rocket.pos.z)**2))
+    #return Vector(0,0,rocket.mass*g*r/((r+rocket.pos.z)**2))
+    return Vector(0,0,rocket.mass*g)
 
 @staticmethod
 def thrust(rocket:'Rocket'):
-    return rocket.motor.getThrust(rocket.midT)
+    return rocket.vel.unitVector()*rocket.motor.getThrust(rocket.midT)
 
 @staticmethod
 def drag(rocket:'Rocket'):
@@ -104,7 +105,7 @@ def drag(rocket:'Rocket'):
 
 class Rocket:
     '''mass[kg]'''
-    def __init__(self, drymass=1, AC_d=0.5, motor:Motor=Motor([0],[0],[0]), initPos:Vector=Vector(0,0,0), initVel:Vector=Vector(0,0,0), statForces:list[function]=[gravity,thrust], linForces:list[function]=[drag]):
+    def __init__(self, drymass:float=0.5, AC_d=0.5, motor:Motor=Motor([0],[0],[0]), initPos:Vector=Vector(0,0,0), initVel:Vector=Vector(0,0,0), statForces:list[Callable[['Rocket'],Vector]]=[gravity,thrust], linForces:list[Callable[['Rocket'],float]]=[drag]):
         self.drymass=drymass
         self.AC_d=AC_d #Area-drag Coefficient, m^2
 
@@ -145,12 +146,12 @@ class Rocket:
         return statForce, linForceFactor
     
     def calculateMass(self):
-        return self.drymass+self.motor.getMass()
+        return self.drymass+self.motor.getMass(self.midT)
 
     def updateMassForces(self,deltaT):
         self.midT=self.t+deltaT/2 #Store midpoint of simulated timestep for motor simulation
-        self.staticF,self.linF=self.calculateForces()
         self.mass=self.calculateMass()
+        self.staticF,self.linF=self.calculateForces()
 
     def simStep(self, deltaT:float):
         self.updateMassForces(deltaT)
@@ -162,14 +163,30 @@ class Rocket:
         v_0=self.vel
         d_0=self.pos
         #When k is very small, only apply static forces to avoid floating point errors
-        if(k<0.001):
+        if(abs(k)<0.0001):
             #Calculate new velocity
-            self.vel=(F*t)/m+v_0
+            self.vel=((v_0*k+F)*t)/m+v_0
             #Calculate new position
-            self.pos=(F*(t**2))/(2*m)+(v_0*t)+d_0
+            self.pos=((v_0*k+F)*(t**2))/(2*m)+(v_0*t)+d_0
         else:
             #Calculate new velocity
             self.vel=(math.exp(k*t/m)*(k*v_0+F)-F)/k
             #Calculate new position
             self.pos=((m*(math.exp(k*t/m)-1)*(k*v_0+F))/(k**2))-(F*t/k)+d_0
         self.t+=deltaT
+
+    def __repr__(self):
+        return "\n".join([
+            f"Time Since Launch: {self.t}",
+            f"Velocity: {self.vel.mag()}",
+            f"Velocity (Components): {str(self.vel)}",
+            f"Position (Components): {str(self.pos)}",
+            f"Mass: {str(self.mass)}",
+            f"Motor Mass: {str(self.motor.getMass(self.t))}",
+            f"Motor Thrust: {str(self.motor.getThrust(self.t))}",
+            f"Static Force Components: {str(self.staticF)}",
+            f"Linear Force Factor: {self.linF}",
+            f"Linear Force Components: {self.vel*self.linF}",
+            f"Total Forces: {self.vel*self.linF+self.staticF}",
+            f"Total Acceleration: {(self.vel*self.linF+self.staticF)/self.mass}"
+        ])
