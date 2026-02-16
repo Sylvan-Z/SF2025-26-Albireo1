@@ -3,6 +3,7 @@ import shutil
 import csv
 from typing import Callable
 import keras
+import itertools
 
 class Iteration:
     def __init__(self, filepath:str, n:int):
@@ -84,47 +85,43 @@ class Model:
                 print("Training reverted")
             else:
                 self.model.fit(xsets,yset,self.batchsize,epochs)
+                prevModel=self.model
                 print("Training completed")
 
-    def optimize(self,maximize:bool,*args):
-        allFeatures = list(map(list, itertools.product(list(np.arange(0, maxes[0]+searchStep, searchStep)),list(np.arange(0, maxes[1]+searchStep, searchStep)),list(np.arange(0, maxes[2]+searchStep, searchStep)))))
-        allDrags = list(map(lambda x: x[0]+controlDrag, model.predict(np.array(allFeatures))))
-
-        bestFeatures=[]
-        bestdrag=float("inf")
-
-        for i in range(len(allFeatures)):
-            if allDrags[i]<bestdrag:
-                bestdrag=allDrags[i]
-                bestFeatures=allFeatures[i]
-                print(format("New best drag: Predicted %s as the best with drag %f" % (str(bestFeatures), bestdrag)))
-
+    def optimize(self,maximize:bool,*xSamples):
+        xSample=np.array(itertools.product(*xSamples),dtype=float)
+        print(xSample)
+        ySample=self.model.predict(xSample,batch_size=self.batchsize)
+        bestXs=xSample[0]
+        bestY=ySample[0]
+        for i in range(len(ySample)):
+            if bestY>ySample[i]==maximize:
+                bestXs=xSample[i]
+                bestY=ySample[i]
+        
         print("Done broad search")
-        print(format("Predicted %s as the best with drag %f" % (str(bestFeatures), bestdrag)))
+        print(format("Predicted %s as the best X with Y %f" % (str(bestXs), bestY)))
         print("Starting gradient descent refinement")
 
         deltaF=0.001
-        deltaT=0.0005
-        residuals=[float("inf")]
-        iterations=0
+        if(maximize):deltaT=-0.0005 
+        else: deltaT=0.0005
+
         while sum(map(lambda x: abs(x), residuals))/len(residuals)>0.00003:
-            allDFeatures=[]
-            for i in range(len(bestFeatures)):
-                allDFeatures.append(bestFeatures.copy())
-                allDFeatures[-1][i]+=deltaF
-            derivitives=list(map(lambda x:(bestdrag-x[0]-controlDrag)/deltaF, model.predict(np.array(allDFeatures))))
+            bestDXs=[]
+            for i in range(len(bestXs)):
+                bestDXs.append(bestXs.copy())
+                bestDXs[-1][i]+=deltaF
+            derivitives=list(map(lambda x:(bestY-x[0])/deltaF, self.model.predict(np.array(bestDXs))))
             newFeatures=[]
             residuals=[]
-            for i in range(len(bestFeatures)):
-                newFeatures.append(bestFeatures[i]+derivitives[i]*deltaT)
-                newFeatures[-1]=np.clip(newFeatures[-1],0,maxes[i])
-                residuals.append(newFeatures[-1]-bestFeatures[i])
-            bestFeatures=newFeatures.copy()
-            bestdrag=model.predict(np.array([bestFeatures]))[0][0]+controlDrag
+            for i in range(len(bestXs)):
+                newFeatures.append(bestXs[i]+derivitives[i]*deltaT)
+                newFeatures[-1]=np.clip(newFeatures[-1],0,max(xSample[i]))
+                residuals.append(newFeatures[-1]-bestXs[i])
+            bestXs=newFeatures.copy()
+            bestdrag=self.model.predict(np.array([bestXs]))[0][0]
             iterations+=1
-            print("Iteration %d: Predicted %s as the best with drag %f, average residual %f" % (iterations, str(bestFeatures), bestdrag, sum(map(lambda x: abs(x), residuals))/len(residuals)))
+            print("Iteration %d: Predicted %s as the best X with Y %f, average residual %f" % (iterations, str(bestXs), bestdrag, sum(map(lambda x: abs(x), residuals))/len(residuals)))
 
-        print("Done refinement")
-        print(format("Predicted %s as the best with drag %f" % (str(bestFeatures), bestdrag)))
-        open(filepath+"/log.txt","w+").write(format("Predicted %s as the best with drag %f\nActual drag: " % (str(bestFeatures), bestdrag)))
-        open(filepath+"/dataset.csv","a").write(format("\n%s," % (",".join(list(map(str, bestFeatures))))))
+            return bestXs
