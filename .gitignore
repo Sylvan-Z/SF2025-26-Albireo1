@@ -1,7 +1,9 @@
 **/*.DS_Store
 **/.DS_Store
 **/Icon
+**/Icon?
 **/*.gdoc
 **/*.gsheet
 **/*.tmp
+**/*.FCStd
 **/*.FCStd.*
