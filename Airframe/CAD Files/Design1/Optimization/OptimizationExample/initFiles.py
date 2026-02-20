@@ -13,7 +13,7 @@ model = keras.models.Sequential([
     
 model.compile(optimizer='adam', loss='mean_squared_error')
 
-model.save(outFilepath+"/model.keras")
+model.save(outFilepath+"/model0.keras")
 
 try:
     open(outFilepath+"/Iter0.csv", "x").write("l,drag,SA,Altitude\n")

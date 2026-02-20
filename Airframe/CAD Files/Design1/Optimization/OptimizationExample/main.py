@@ -54,17 +54,17 @@ while True:
 
     print(iteration.deltas)
 
-    model=Model(iteration.parentFilepath)
-
     xSets=[[iteration.deltas.at[i,'l']] for i in range(len(iteration.deltas))]
     ySets=[iteration.deltas.at[i,'Altitude']/50 for i in range(len(iteration.deltas))]#Factors are arbutrary, but keep i/o in a reasonable magnitude
 
     print(xSets)
     print(ySets)
 
-    model.fit(xSets,ySets)
+    iteration.fit(xSets,ySets)
 
-    model.optimize(True,np.arange(2.7,15.0,0.1))
+    optimizedX=iteration.optimize(True,np.arange(2.7,15.0,0.1))[0]
+
+    iteration.addRow({"l":optimizedX})
 
     if input("Save Model?(Y/N): ")=="Y":
-        model.save()
+        iteration.saveAll()

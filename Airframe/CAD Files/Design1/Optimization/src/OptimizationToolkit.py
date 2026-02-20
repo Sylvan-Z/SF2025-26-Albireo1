@@ -6,12 +6,16 @@ import itertools
 import pandas as pd
 
 class Iteration:
-    def __init__(self, filepath:str, n:int):
+    def __init__(self, filepath:str, n:int, batchsize:int=25):
         self.n=int(n)
         self.parentFilepath=filepath
         self.reloadData()
+        self.reloadModel()
         self.updateControl()
+        self.batchsize=batchsize
+    
 
+    #Data Handling
     def generateDeltas(self):
         self.updateControl()
         self.deltas=pd.DataFrame(columns=self.df.columns)
@@ -24,27 +28,21 @@ class Iteration:
     def updateControl(self):
         self.control=self.df.iloc[0] 
 
+    def addRow(self,row:dict[str,float]):
+        self.df.loc(len(self.df))=row
+
+    def saveCsv(self):
+        self.df.to_csv(path_or_buf=self.parentFilepath+f"/iter{self.n}.csv")
+
+
+    #Model handelling
+    def reloadModel(self):
+        self.model:keras.Sequential=keras.models.load_model(self.parentFilepath+f"/model{self.n}.keras")
+
     def calculateNulls(self,key:str, func:Callable[[pd.Series,pd.Series],float]):
         for row in range(len(self.df)):
             if self.df.at[row,key]==-1:
                 self.df.at[row,key]=func(self.df.iloc[row],self.control)
-        
-    def writeAll(self):
-        self.df.to_csv(path_or_buf=self.parentFilepath+f"/iter{self.n}.csv")
-
-    def nextIteration(self):
-        shutil.copy(self.parentFilepath+f"/Iter{self.n}.csv",self.parentFilepath+f"/Iter{self.n+1}.csv")
-        iteration=Iteration(self.parentFilepath,self.n+1)
-        return iteration
-    
-class Model:
-    def __init__(self,filepath,batchsize:int=25):
-        self.filepath=filepath
-        self.batchsize=batchsize
-        self.reloadModel()
-    
-    def reloadModel(self):
-        self.model:keras.Sequential=keras.models.load_model(self.filepath+"/model.keras")
 
     def fit(self,xsets:list[list[float]],yset:list[float]):
         xsets=np.array(xsets, dtype=float)
@@ -64,7 +62,7 @@ class Model:
                 prevModel=self.model
                 print("Training completed")
 
-    def optimize(self,maximize:bool,*xSamples):
+    def optimize(self,maximize:bool, *xSamples):
         xSample=np.array(list(itertools.product(*xSamples)),dtype=float)
         print(xSample)
         ySample=self.model.predict(xSample,batch_size=self.batchsize)
@@ -104,5 +102,15 @@ class Model:
 
             return bestXs
         
-    def save(self):
-        self.model.save(self.filepath+"/model.keras")
+    def saveModel(self):
+        self.model.save(self.parentFilepath+"/model.keras")
+
+    def saveAll(self):
+        self.saveCsv()
+        self.saveModel()
+    
+    def nextIteration(self):
+        shutil.copy(self.parentFilepath+f"/model{self.n}.keras",self.parentFilepath+f"/model{self.n+1}.keras")
+        shutil.copy(self.parentFilepath+f"/Iter{self.n}.csv",self.parentFilepath+f"/Iter{self.n+1}.csv")
+        iteration=Iteration(self.parentFilepath,self.n+1)
+        return iteration
