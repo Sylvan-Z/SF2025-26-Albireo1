@@ -1,64 +1,40 @@
 import numpy as np
 import shutil
-import csv
 from typing import Callable
 import keras
 import itertools
+import pandas as pd
 
 class Iteration:
     def __init__(self, filepath:str, n:int):
         self.n=int(n)
         self.parentFilepath=filepath
-        self.csvFile=open(filepath+f"/Iter{n}.csv",'a+')
-        self.csvFile.seek(0)
-        self.reader=csv.DictReader(self.csvFile)
-        self.writer=csv.DictWriter(self.csvFile,self.reader.fieldnames)
-        self.readAll()
-        self.control=self.rows[0]
-        self.generateDeltas()
-
-    def readAll(self):
-        self.rows:list[dict[str,float]]=[]
-        self.columns:dict[str,list[float]]=dict.fromkeys(self.reader.fieldnames,[])
-        self.resetReader()
-        for row in self.reader:
-            self.rows.append({key:float(row[key]) for key in row.keys()})
-            self.columns={key:self.columns[key]+[float(row[key])] for key in row.keys()}
+        self.reloadData()
+        self.updateControl()
 
     def generateDeltas(self):
-        self.deltasRows=[{self.columns[key][i]-self.control[key] for key in self.reader.fieldnames} for i in range(len(self.rows))]
-        self.deltasColumns:dict[str,list[float]]={key:[self.columns[key][i]-self.control[key] for i in range(len(self.columns[key]))] for key in self.reader.fieldnames}
+        self.updateControl()
+        self.deltas=pd.DataFrame(columns=self.df.columns)
+        for column in self.deltas.columns.to_list():
+            self.deltas[column]=self.df[column]-self.control[column]
+    
+    def reloadData(self):
+        self.df=pd.read_csv(self.parentFilepath+f"/iter{self.n}.csv")
 
-    def resetReader(self):
-        self.reader.line_num=0
-    
-    def scanForNulls(self,key:str):
-        nulls=[]
-        for i in range(len(self.rows)):
-            if self.rows[i][key]==-1:
-                nulls.append(i)
-        return nulls
-    
-    def calculateNulls(self,key:str, func:Callable[[dict[str,float],dict[str,float]],float]):
-        for i in self.scanForNulls(key):
-            self.rows[i][key]=func(self.control,self.rows[i])
-        self.writeAll()
-        self.readAll()
+    def updateControl(self):
+        self.control=self.df.iloc[0] 
+
+    def calculateNulls(self,key:str, func:Callable[[pd.Series,pd.Series],float]):
+        for row in range(len(self.df)):
+            if self.df.at[row,key]==-1:
+                self.df.at[row,key]=func(self.df.iloc[row],self.control)
         
-    def writeAll(self, key:str):
-        self.csvFile.seek(0)
-        self.csvFile.truncate()
-        self.csvFile.seek(0)
-        self.writer.writeheader()
-        self.writer.writerows(self.rows)
-
-    def close(self):
-        self.csvFile.close()
+    def writeAll(self):
+        self.df.to_csv(path_or_buf=self.parentFilepath+f"/iter{self.n}.csv")
 
     def nextIteration(self):
         shutil.copy(self.parentFilepath+f"/Iter{self.n}.csv",self.parentFilepath+f"/Iter{self.n+1}.csv")
         iteration=Iteration(self.parentFilepath,self.n+1)
-        self.close()
         return iteration
     
 class Model:
@@ -70,11 +46,11 @@ class Model:
     def reloadModel(self):
         self.model:keras.Sequential=keras.models.load_model(self.filepath+"/model.keras")
 
-
     def fit(self,xsets:list[list[float]],yset:list[float]):
         xsets=np.array(xsets, dtype=float)
         yset=np.array(yset, dtype=float)
         prevModel=self.model
+        print(xsets)
         while True:
             print(self.model.evaluate(xsets,yset))
             epochs=int(input("Epochs (>0:epochs, =0:Break, =-1:Go back): "))
@@ -89,7 +65,7 @@ class Model:
                 print("Training completed")
 
     def optimize(self,maximize:bool,*xSamples):
-        xSample=np.array(itertools.product(*xSamples),dtype=float)
+        xSample=np.array(list(itertools.product(*xSamples)),dtype=float)
         print(xSample)
         ySample=self.model.predict(xSample,batch_size=self.batchsize)
         bestXs=xSample[0]
@@ -106,6 +82,8 @@ class Model:
         deltaF=0.001
         if(maximize):deltaT=-0.0005 
         else: deltaT=0.0005
+        residuals=[float("inf")]
+        iterations=0
 
         while sum(map(lambda x: abs(x), residuals))/len(residuals)>0.00003:
             bestDXs=[]
@@ -117,11 +95,14 @@ class Model:
             residuals=[]
             for i in range(len(bestXs)):
                 newFeatures.append(bestXs[i]+derivitives[i]*deltaT)
-                newFeatures[-1]=np.clip(newFeatures[-1],0,max(xSample[i]))
+                newFeatures[-1]=np.clip(newFeatures[-1],min(xSample[i]),max(xSample[i]))
                 residuals.append(newFeatures[-1]-bestXs[i])
             bestXs=newFeatures.copy()
-            bestdrag=self.model.predict(np.array([bestXs]))[0][0]
+            bestdrag=self.model.predict(np.array(bestXs,dtype=float))[0][0]
             iterations+=1
             print("Iteration %d: Predicted %s as the best X with Y %f, average residual %f" % (iterations, str(bestXs), bestdrag, sum(map(lambda x: abs(x), residuals))/len(residuals)))
 
             return bestXs
+        
+    def save(self):
+        self.model.save(self.filepath+"/model.keras")

@@ -2,6 +2,7 @@ import math
 import csv as csvReaders
 import numpy as np
 
+from copy import copy
 from typing import Callable
 
 class Vector:
@@ -190,3 +191,6 @@ class Rocket:
             f"Total Forces: {self.vel*self.linF+self.staticF}",
             f"Total Acceleration: {(self.vel*self.linF+self.staticF)/self.mass}"
         ])
+    
+    def copy(self):
+        return copy(self)

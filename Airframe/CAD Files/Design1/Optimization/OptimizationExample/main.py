@@ -4,33 +4,67 @@ from src.RocketSimToolkit import *
 
 F_15Motor=Motor(filepath='MotorData/Estes_F15.csv')
 
-controlRocket=Rocket(drymass=0.3,#Should be changed
-                     initVel=Vector(0,0,0.2),#Simulates launch rod
+controlRocket=Rocket(drymass=0.2,#Should be changed
+                     initVel=Vector(0,0,1),#Simulates launch rod
                      initPos=Vector(0,0,40*1000),
                      motor=F_15Motor)
 
 controlDrag=0.5 #Needs to be simulated, at 50m/s
 
-iteration=Iteration(str(pathlib.Path(__file__).resolve().parent), input("Start from Iteration: ")).nextIteration()
+#Null handlers
+def calcNoseMass(df, control):
+    return control["noseMass"]*df["SA"]/control["SA"]
 
-print(iteration.rows)
-
-def calcNoseMass(control,row):
-    return control["noseMass"]*row["SA"]/control["SA"]
-
-iteration.calculateNulls("noseMass",calcNoseMass)
-
-def calculateAltitude(control,row):
-    rocket=controlRocket
-    rocket.drymass=controlRocket.drymass-control["noseMass"]+row["noseMass"]
-    rocket.AC_dFromDrag(controlDrag-control["drag"]+row["drag"],earthAtmosphericModel(controlRocket.pos.z)[0])
+def calculateAltitude(df,control):
+    rocket=controlRocket.copy()
+    rocket.drymass=controlRocket.drymass-control["noseMass"]/1000+df["noseMass"]/1000
+    rocket.AC_dFromDrag(controlDrag-control["drag"]+df["drag"], 50, earthAtmosphericModel(controlRocket.pos.z)[0])
 
     deltaT=0.001#shorter timestep for motor burn
     while(rocket.vel.z>=0):#Only simulate upwards flight
         rocket.simStep(deltaT)
         if(rocket.mass==rocket.drymass):
             deltaT=0.02 #Longer timesteps after motor burnout
-        print(rocket)
-        return rocket.pos.z-controlRocket.pos.z#apoapsis-initial altitude
-    
-iteration.calculateNulls("Altitude", calculateAltitude)
+    print(rocket)
+    return rocket.pos.z-controlRocket.pos.z#apoapsis-initial altitude
+
+
+while True:
+    n=int(input("Start from Iteration (-1 to exit): "))
+
+    if(n==-1):
+        break
+
+    iteration=Iteration(str(pathlib.Path(__file__).resolve().parent), n).nextIteration()
+
+    iteration.calculateNulls("noseMass",calcNoseMass)
+        
+    iteration.calculateNulls("Altitude", calculateAltitude)
+
+    print("final DF")
+    print(iteration.df)
+
+    print("All nulls replaced, saving csv and starting optimization")
+
+    iteration.writeAll()
+
+    iteration.generateDeltas()
+
+    print("Deltas:")
+
+    print(iteration.deltas)
+
+    model=Model(iteration.parentFilepath)
+
+    xSets=[[iteration.deltas.at[i,'l']] for i in range(len(iteration.deltas))]
+    ySets=[iteration.deltas.at[i,'Altitude']/50 for i in range(len(iteration.deltas))]#Factors are arbutrary, but keep i/o in a reasonable magnitude
+
+    print(xSets)
+    print(ySets)
+
+    model.fit(xSets,ySets)
+
+    model.optimize(True,np.arange(2.7,15.0,0.1))
+
+    if input("Save Model?(Y/N): ")=="Y":
+        model.save()

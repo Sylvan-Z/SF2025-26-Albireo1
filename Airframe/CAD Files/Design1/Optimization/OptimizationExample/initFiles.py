@@ -5,7 +5,7 @@ import pathlib
 outFilepath = str(pathlib.Path(__file__).resolve().parent)
 
 model = keras.models.Sequential([
-    keras.Input(shape=(2,)),
+    keras.Input(shape=(1,)),
     keras.layers.Dense(128,activation=tf.nn.leaky_relu),
     keras.layers.Dense(128,activation=tf.nn.leaky_relu),
     keras.layers.Dense(1,activation="linear")
