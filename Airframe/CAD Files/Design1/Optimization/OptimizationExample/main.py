@@ -46,7 +46,7 @@ while True:
 
     print("All nulls replaced, saving csv and starting optimization")
 
-    iteration.writeAll()
+    iteration.saveAll()
 
     iteration.generateDeltas()
 
@@ -64,7 +64,7 @@ while True:
 
     optimizedX=iteration.optimize(True,np.arange(2.7,15.0,0.1))[0]
 
-    iteration.addRow({"l":optimizedX})
+    iteration.addRow({"l":optimizedX[0]})
 
     if input("Save Model?(Y/N): ")=="Y":
         iteration.saveAll()

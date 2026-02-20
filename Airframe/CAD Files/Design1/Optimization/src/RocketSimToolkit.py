@@ -89,23 +89,23 @@ def gravity(rocket:'Rocket'):
     '''Calculates gravity, varying with the rocket's altitude'''
     g = -9.81   # m/s^2, gravity
     r = 6371000 #Earth mean radius, m
-    return Vector(0,0,rocket.mass*g*(r/(r+rocket.pos.z))**2)
+    return Vector(0,0,rocket.mass*g*(r/(r+rocket.pos.z))**2),0
 
 @staticmethod
 def thrust(rocket:'Rocket'):
-    return rocket.vel.unitVector()*rocket.motor.getThrust(rocket.midT)
+    return rocket.vel.unitVector()*rocket.motor.getThrust(rocket.midT),0
 
 @staticmethod
 def drag(rocket:'Rocket'):
     '''Calculates linear drag coeffecient, varying rocket velocity'''
     v=rocket.vel.mag()
     rho,T,p=earthAtmosphericModel(rocket.pos.z)
-    return -0.5*rho*rocket.AC_d*v #one V, because linear scaling by vector velocity
+    return Vector(0,0,0),-0.5*rho*rocket.AC_d*v #one V, because linear scaling by vector velocity
 
 
 class Rocket:
     '''mass[kg]'''
-    def __init__(self, drymass:float=0.5, AC_d=0.5, motor:Motor=Motor([0],[0],[0]), initPos:Vector=Vector(0,0,0), initVel:Vector=Vector(0,0,0), statForces:list[Callable[['Rocket'],Vector]]=[gravity,thrust], linForces:list[Callable[['Rocket'],float]]=[drag]):
+    def __init__(self, drymass:float=0.5, AC_d=0.5, motor:Motor=Motor([0],[0],[0]), initPos:Vector=Vector(0,0,0), initVel:Vector=Vector(0,0,0), forces:list[Callable[['Rocket'],tuple[Vector,float]]]=[gravity,thrust,drag]):
         self.drymass=drymass
         self.AC_d=AC_d #Area-drag Coefficient, m^2
 
@@ -114,8 +114,7 @@ class Rocket:
 
         self.motor=motor
 
-        self.statForceFunctions=statForces
-        self.linForceFunctions=linForces
+        self.forces=forces
 
         self.t=0.0
 
@@ -136,12 +135,11 @@ class Rocket:
         Returns: static forces, linear drag forces
         '''
         statForce=Vector(0,0,0)
-        for force in self.statForceFunctions:
-            statForce+=force(self)
-
         linForceFactor=0
-        for force in self.linForceFunctions:
-            linForceFactor+=force(self)
+        for forceFunc in self.forces:
+            force=forceFunc(self)
+            statForce+=force[0]
+            linForceFactor+=force[1]
 
         return statForce, linForceFactor
     

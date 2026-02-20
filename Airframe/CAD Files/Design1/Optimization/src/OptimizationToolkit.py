@@ -29,10 +29,10 @@ class Iteration:
         self.control=self.df.iloc[0] 
 
     def addRow(self,row:dict[str,float]):
-        self.df.loc(len(self.df))=row
+        self.df.loc[len(self.df)]=row
 
     def saveCsv(self):
-        self.df.to_csv(path_or_buf=self.parentFilepath+f"/iter{self.n}.csv")
+        self.df.to_csv(path_or_buf=self.parentFilepath+f"/iter{self.n}.csv", index=False)
 
 
     #Model handelling
