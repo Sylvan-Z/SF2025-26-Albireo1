@@ -35,13 +35,13 @@ class Iteration:
         self.df.to_csv(path_or_buf=self.parentFilepath+f"/iter{self.n}.csv", index=False)
 
 
-    #Model handelling
+    #Model handling
     def reloadModel(self):
         self.model:keras.Sequential=keras.models.load_model(self.parentFilepath+f"/model{self.n}.keras")
 
     def calculateNulls(self,key:str, func:Callable[[pd.Series,pd.Series],float]):
         for row in range(len(self.df)):
-            if self.df.at[row,key]==-1:
+            if self.df.at[row,key]==-1 or self.df.at[row,key]==None:
                 self.df.at[row,key]=func(self.df.iloc[row],self.control)
 
     def fit(self,xsets:list[list[float]],yset:list[float]):
@@ -65,42 +65,53 @@ class Iteration:
     def optimize(self,maximize:bool, *xSamples):
         xSample=np.array(list(itertools.product(*xSamples)),dtype=float)
         print(xSample)
-        ySample=self.model.predict(xSample,batch_size=self.batchsize)
-        bestXs=xSample[0]
-        bestY=ySample[0]
+        ySample=self.model.predict(xSample)
+        print(ySample)
+
+        bestXs:list=xSample[0]
+        bestY:list=ySample[0]
+
         for i in range(len(ySample)):
-            if bestY>ySample[i]==maximize:
-                bestXs=xSample[i]
-                bestY=ySample[i]
+            if (bestY<ySample[i])==maximize:
+                bestXs=xSample[i].tolist()
+                bestY=ySample[i][0]
         
         print("Done broad search")
         print(format("Predicted %s as the best X with Y %f" % (str(bestXs), bestY)))
         print("Starting gradient descent refinement")
 
-        deltaF=0.001
-        if(maximize):deltaT=-0.0005 
-        else: deltaT=0.0005
+        deltaF=0.01
+        if(maximize):deltaT=-0.05
+        else: deltaT=0.05
         residuals=[float("inf")]
         iterations=0
 
-        while sum(map(lambda x: abs(x), residuals))/len(residuals)>0.00003:
-            bestDXs=[]
+        while sum(map(lambda x: abs(x), residuals))/len(residuals)>0.003:
+            print(f"Best Xs {bestXs}")
+            dXs=[]
             for i in range(len(bestXs)):
-                bestDXs.append(bestXs.copy())
-                bestDXs[-1][i]+=deltaF
-            derivitives=list(map(lambda x:(bestY-x[0])/deltaF, self.model.predict(np.array(bestDXs))))
+                dXs.append(bestXs.copy())
+                dXs[-1][i]+=deltaF
+            print(f"dXs {dXs}")
+            dYs=list(map(lambda x:(bestY-x[0])/deltaF, self.model.predict(np.array(dXs))))
+            print(f"dYs {dYs}")
             newFeatures=[]
             residuals=[]
             for i in range(len(bestXs)):
-                newFeatures.append(bestXs[i]+derivitives[i]*deltaT)
-                newFeatures[-1]=np.clip(newFeatures[-1],min(xSample[i]),max(xSample[i]))
+                print("bestXs[i]",str(bestXs[i]))
+                print("(dYs[i]*deltaT)",str((dYs[i]*deltaT)))
+                print("deltaT",str(deltaT))
+                newFeatures.append(bestXs[i]+(dYs[i]*deltaT))
+                print(newFeatures)
+                newFeatures[-1]=np.clip(newFeatures[-1],min(xSamples[i]),max(xSamples[i]))
                 residuals.append(newFeatures[-1]-bestXs[i])
             bestXs=newFeatures.copy()
-            bestdrag=self.model.predict(np.array(bestXs,dtype=float))[0][0]
+            bestY=self.model.predict(np.array([bestXs],dtype=float))[0][0]
             iterations+=1
-            print("Iteration %d: Predicted %s as the best X with Y %f, average residual %f" % (iterations, str(bestXs), bestdrag, sum(map(lambda x: abs(x), residuals))/len(residuals)))
+            print("Iteration %d: Predicted %s as the best X with Y %f, average residual %f" % (iterations, str(list(bestXs)), bestY, sum(map(lambda x: abs(x), residuals))/len(residuals)))
 
-            return bestXs
+        print(f"Optimization completed, bestXs: {bestXs}")
+        return bestXs
         
     def saveModel(self):
         self.model.save(self.parentFilepath+"/model.keras")
