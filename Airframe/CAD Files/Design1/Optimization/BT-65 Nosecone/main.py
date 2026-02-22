@@ -44,7 +44,7 @@ while True:
     print("final DF")
     print(iteration.df)
 
-    print("All nulls replaced, saving csv and starting optimization")
+    print("All nulls replaced, saving tsv and starting optimization")
 
     iteration.saveAll()
 
@@ -54,8 +54,8 @@ while True:
 
     print(iteration.deltas)
 
-    xSets=[[iteration.deltas.at[i,'l']] for i in range(len(iteration.deltas))]
-    ySets=[iteration.deltas.at[i,'Altitude']/50 for i in range(len(iteration.deltas))]#Factors are arbutrary, but keep i/o in a reasonable magnitude
+    xSets=[[iteration.df.at[i,'l']] for i in range(len(iteration.df))]
+    ySets=[iteration.deltas.at[i,'Altitude'] for i in range(len(iteration.deltas))]#Factors are arbutrary, but keep i/o in a reasonable magnitude
 
     print(xSets)
     print(ySets)

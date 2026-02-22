@@ -16,6 +16,6 @@ model.compile(optimizer='adam', loss='mean_squared_error')
 model.save(outFilepath+"/model0.keras")
 
 try:
-    open(outFilepath+"/Iter0.csv", "x").write("l,drag,SA,Altitude\n")
+    open(outFilepath+"/Iter0.tsv", "x").write("l\tdrag\tSA\tAltitude\n")
 except FileExistsError:
     print("Dataset file already exists")
