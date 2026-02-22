@@ -6,7 +6,5 @@ Icon
 **/*.gdoc
 **/*.gsheet
 **/*.tmp
-**/*.FCStd
-**/*.FCStd.*
 .tmp.driveupload/
-*.FCBak
+**/*.FCBak
